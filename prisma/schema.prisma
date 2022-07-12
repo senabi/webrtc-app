@@ -2,15 +2,65 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
+    provider        = "prisma-client-js"
+    previewFeatures = ["referentialIntegrity"]
 }
 
 datasource db {
-    provider = "sqlite"
-    url      = "file:./db.sqlite"
-    // url      = env("DATABASE_URL")
+    provider             = "mysql"
+    url                  = env("DATABASE_URL")
+    referentialIntegrity = "prisma"
 }
 
-model Example {
-    id String @id @default(cuid())
+model Room {
+    id              String           @id @default(cuid())
+    createdAt       DateTime         @default(now())
+    updatedAt       DateTime         @default(now())
+    offerCandidate  OfferCandidate?
+    answerCandidate AnswerCandidate?
+    peers           Peer[]
 }
+
+model Peer {
+    id     String @id @default(cuid())
+    roomId String
+    room   Room   @relation(fields: [roomId], references: [id])
+}
+
+// peers     Peer[]
+// model Peer {
+//     id        String   @id @default(cuid())
+//     room      Room     @relation(fields: [roomId], references: [id])
+//     roomId    String
+//     createdAt DateTime @default(now())
+//     updatedAt DateTime @default(now())
+//     offer     String
+//     candidate String
+// }
+
+model OfferCandidate {
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+    room      Room     @relation(fields: [roomId], references: [id])
+    roomId    String   @unique
+    data      String
+}
+
+model AnswerCandidate {
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+    room      Room     @relation(fields: [roomId], references: [id])
+    roomId    String   @unique
+    data      String
+}
+
+// model Offer {
+//     id        String   @id @default(cuid())
+//     createdAt DateTime @default(now())
+//     updatedAt DateTime @default(now())
+//     peer      Peer     @relation(fields: [peerId], references: [id])
+//     peerId    String
+//     offer     String
+// }
