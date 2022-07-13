@@ -25,47 +25,69 @@ export const roomRouter = createRouter()
       });
     },
   })
-  .mutation("add-offer", {
+  .mutation("add-answer", { // Answer
     input: z.object({
       roomId: z.string(),
       peerId: z.string(),
-      offer: z.string(),
+      answer: z.string(),
     }),
     async resolve({ input, ctx }) {
-      // const offerCandidate = await ctx.prisma.offerCandidate.create({
-      //   data: {
-      //     roomId: input.roomId,
-      //     data: input.data,
-      //   },
-      // });
-      // ee.emit("add", offerCandidate);
-      // return offerCandidate;
-      // return await ctx.prisma.peer.groupBy({
-      //   where: { roomId: input.roomId },
-      //   by: ["id", "offer"],
-      // });
-      ee.emit("add-offer", input.roomId, input.offer, input.peerId);
-      // return input;
+      ee.emit("add-answer", input.roomId, input.answer, input.peerId);
     },
   })
-  .subscription("on-add-offer", {
+  .subscription("on-add-answer", { // Answer subscription
     input: z.object({
       roomId: z.string(),
       peerId: z.string().optional(),
     }),
     resolve({ input, ctx }) {
-      type onAffOfferSubType = {
+      type onAddAnswerSubType = {
         senderId: string;
-        offer: string;
+        answer: string;
       };
-      return new Subscription<onAffOfferSubType>(emit => {
-        const onAddOffer = (
+      return new Subscription<onAddAnswerSubType>(emit => {
+        const onAddAnswer = (
           roomId: string,
-          offer: string,
+          answer: string,
           senderId: string
         ) => {
           if (roomId === input.roomId) {
-            emit.data({ senderId: senderId, offer });
+            emit.data({ senderId: senderId, answer });
+          }
+        };
+        ee.on("add-answer", onAddAnswer);
+        return () => ee.off("add-answer", onAddAnswer);
+      });
+    },
+  })
+  .mutation("add-offer", { // add offer
+    input: z.object({
+      roomId: z.string(),
+      peerId: z.string(),
+      sdp: z.string(),
+    }),
+    async resolve({ input, ctx }) {
+      ee.emit("add-offer", input.roomId, input.sdp, input.peerId);
+    },
+  })
+  .subscription("on-add-offer", { // offer subscription
+    input: z.object({
+      roomId: z.string(),
+      peerId: z.string().optional(),
+    }),
+    resolve({ input, ctx }) {
+      type onAddOfferSubType = {
+        senderId: string;
+        sdp: string;
+      };
+      return new Subscription<onAddOfferSubType>(emit => {
+        const onAddOffer = (
+          roomId: string,
+          senderId: string,
+          sdp: string,
+        ) => {
+          if (roomId === input.roomId) {
+            emit.data({ senderId: senderId, sdp });
           }
         };
         ee.on("add-offer", onAddOffer);
@@ -73,20 +95,39 @@ export const roomRouter = createRouter()
       });
     },
   })
-  .mutation("add-answer", {
+  .mutation("add-icecanditate", { // add icecandiate
     input: z.object({
       roomId: z.string(),
-      data: z.string(),
+      peerId: z.string(),
+      icecandidate: z.string(),
     }),
     async resolve({ input, ctx }) {
-      const answerCandidate = await ctx.prisma.answerCandidate.create({
-        data: {
-          roomId: input.roomId,
-          data: input.data,
-        },
+      ee.emit("add-icecandidate", input.roomId, input.icecandidate, input.peerId);
+    },
+  })
+  .subscription("on-add-icecandidate", { // icecandidate subscription
+    input: z.object({
+      roomId: z.string(),
+      peerId: z.string().optional(),
+    }),
+    resolve({ input, ctx }) {
+      type onAddIceCandidateSubType = {
+        senderId: string;
+        icecandidate: string;
+      };
+      return new Subscription<onAddIceCandidateSubType>(emit => {
+        const onAddICECandidate = (
+          roomId: string,
+          senderId: string,
+          icecandidate: string,
+        ) => {
+          if (roomId === input.roomId) {
+            emit.data({ senderId: senderId, icecandidate });
+          }
+        };
+        ee.on("add-icecandidate", onAddICECandidate);
+        return () => ee.off("add-icecandidate", onAddICECandidate);
       });
-      // ee.emit("add", answerCandidate);
-      return answerCandidate;
     },
   })
   .mutation("add-peer", {

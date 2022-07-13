@@ -9,11 +9,44 @@ const useOffer = (peerId: string | undefined) => {};
 const RoomPageContentMedia: React.FC<{ data: Room }> = ({ data }) => {
   // const userVideo = useRef<HTMLVideoElement>(document.createElement("video"));
   // const [localId, setLocalId] = useState<string>("");
+  let localId: string = "";
   const [offerBtnDisabled, setOfferBtnDisabled] = useState<boolean>(false);
   const [answerBtnDisabled, setAnswerBtnDisabled] = useState<boolean>(false);
-  const { mutate: mutateAnswer } = trpc.useMutation("room.add-answer", {
-    onSuccess: data => {
-      console.log("success local peer added with ID:", data.id);
+  // const { mutate: mutateAnswer } = trpc.useMutation("room.add-answer", {
+  //   onSuccess: data => {
+  //     console.log("success local peer added with ID:", data.id);
+  //   },
+  // });
+
+  const [isPeerCreated, setIsPeerCreated] = useState<boolean>(false);
+
+  const {
+    mutate,
+    isLoading,
+    data: peerData,
+  } = trpc.useMutation("room.add-peer", {
+    onSuccess: p => {
+      setIsPeerCreated(true);
+      console.log("success peer added with ID:", p.id);
+    },
+  });
+
+  trpc.useSubscription(["room.on-join-room", { roomId: data.id }], {
+    onNext: p => {
+      while (localId === "") {}
+      for (const peer of p) {
+        console.log(peer);
+        if (peer.id === peerData?.id) {
+          console.log("same peer");
+        }
+      }
+      console.log("on-join-room", p);
+    },
+  });
+  // onAddOffer
+  trpc.useSubscription(["room.on-add-offer", { roomId: data.id }], {
+    onNext: o => {
+      console.log(o);
     },
   });
   const { mutate: mutateAddOffer } = trpc.useMutation("room.add-offer", {
@@ -21,30 +54,32 @@ const RoomPageContentMedia: React.FC<{ data: Room }> = ({ data }) => {
       console.log("success local peer added with ID:", data);
     },
   });
-  const {
-    mutate,
-    isLoading,
-    data: peerData,
-  } = trpc.useMutation("room.add-peer", {
-    onSuccess: p => {
-      console.log("success peer added with ID:", p.id);
+  // onAddAnswer
+  trpc.useSubscription(["room.on-add-answer", { roomId: data.id }], {
+    onNext: a => {
+      console.log("onAddAnswer", a);
     },
   });
-  trpc.useSubscription(["room.on-join-room", { roomId: data.id }], {
-    onNext: p => {
-      console.log("on-join-room", p);
+  const { mutate: mutateAddAnswer } = trpc.useMutation("room.add-answer", {
+    onSuccess: data => {
+      console.log("sent successfully from:", peerData?.id);
     },
   });
-  trpc.useSubscription(["room.on-add-offer", { roomId: data.id }], {
-    onNext: o => {
-      console.log(o);
+  // onAddIceCandidate
+  trpc.useSubscription(["room.on-add-icecandidate", { roomId: data.id }], {
+    onNext: c => {
+      console.log("onAddIceCandidate", c);
     },
   });
-  // trpc.useSubscription(["room.onAddPeer", { roomId: data.id }], {
-  //   onNext(data) {
-  //     console.log("subscription", data);
-  //   },
-  // });
+  const { mutate: mutateAddIceCandidate } = trpc.useMutation(
+    "room.add-icecanditate",
+    {
+      onSuccess: data => {
+        console.log("sent successfully from:", peerData?.id);
+      },
+    }
+  );
+
   const localConnRef = useRef<RTCPeerConnection>();
   const localTracksRef = useRef<MediaStreamTrack[]>([]);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -59,41 +94,48 @@ const RoomPageContentMedia: React.FC<{ data: Room }> = ({ data }) => {
       });
       (localVideoRef.current as HTMLVideoElement).srcObject =
         localStreamRef.current;
-      //   localConnRef.current = new RTCPeerConnection({
-      //     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-      //   });
-      //   localStreamRef.current = await navigator.mediaDevices.getUserMedia({
-      //     video: true,
-      //     // audio: true,
-      //   });
-      //   remoteStreamRef.current = new MediaStream();
-      //   // push tracks from local stream to peer connection
-      //   localStreamRef.current.getTracks().forEach(track => {
-      //     localConnRef.current?.addTrack(
-      //       track,
-      //       localStreamRef.current as MediaStream
-      //     );
-      //   });
-      //   // pull tracks from remote stream
-      //   localConnRef.current.ontrack = event => {
-      //     event.streams[0]?.getTracks().forEach(track => {
-      //       remoteStreamRef.current?.addTrack(track);
-      //     });
-      //   };
-      //   // video elements
-      //   if (localVideoRef.current && remoteVideoRef.current) {
-      //     localVideoRef.current.srcObject = localStreamRef.current;
-      //     remoteVideoRef.current.srcObject = remoteStreamRef.current;
-      //   }
-      //   console.log("useEffect");
-      //   console.log(localConnRef.current);
     };
     return () => {
       init();
     };
   }, []);
 
-  const createPeer = () => {};
+  const createPeer = (peerId: string) => {
+    const peer = new RTCPeerConnection();
+    peer.onicecandidate = handleICECandidateEvent;
+    peer.ontrack = handleTrackEvent;
+    peer.onnegotiationneeded = () => handleNegotiationNeededEvent(peerId);
+    return peer;
+  };
+
+  const handleNegotiationNeededEvent = (otherPeerId: string) => {
+    localConnRef.current
+      ?.createOffer()
+      .then(offer => localConnRef.current?.setLocalDescription(offer))
+      .then(() => {
+        mutateAddOffer({
+          roomId: data.id,
+          peerId: peerData?.id as string,
+          sdp: JSON.stringify(localConnRef.current?.localDescription?.toJSON()),
+        });
+      })
+      .catch(e => console.error(e));
+  };
+
+  const handleTrackEvent = (e: RTCTrackEvent) => {
+    (remoteVideoRef.current as HTMLVideoElement).srcObject = e
+      .streams[0] as MediaStream;
+  };
+
+  const handleICECandidateEvent = (event: RTCPeerConnectionIceEvent) => {
+    if (event.candidate) {
+      mutateAddIceCandidate({
+        roomId: data.id,
+        peerId: peerData?.id as string,
+        icecandidate: JSON.stringify(event.candidate.toJSON()),
+      });
+    }
+  };
 
   const handleCreateAnswer = async () => {
     console.log("yikes");
