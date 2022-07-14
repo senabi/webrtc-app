@@ -1,104 +1,74 @@
-import { Room } from "@prisma/client";
+import { Peer, Room } from "@prisma/client";
 import { useRouter } from "next/router";
 import { MutableRefObject, useEffect, useRef, useState } from "react";
 import { trpc } from "../../utils/trpc";
 import * as sdpTransform from "sdp-transform";
 
-const useOffer = (peerId: string | undefined) => {};
-
-const RoomPageContentMedia: React.FC<{ data: Room }> = ({ data }) => {
-  // const userVideo = useRef<HTMLVideoElement>(document.createElement("video"));
-  // const [localId, setLocalId] = useState<string>("");
-  let localId: string = "";
-  const [offerBtnDisabled, setOfferBtnDisabled] = useState<boolean>(false);
-  const [answerBtnDisabled, setAnswerBtnDisabled] = useState<boolean>(false);
-  // const { mutate: mutateAnswer } = trpc.useMutation("room.add-answer", {
-  //   onSuccess: data => {
-  //     console.log("success local peer added with ID:", data.id);
-  //   },
-  // });
-
-  const [isPeerCreated, setIsPeerCreated] = useState<boolean>(false);
-
-  const {
-    mutate,
-    isLoading,
-    data: peerData,
-  } = trpc.useMutation("room.add-peer", {
-    onSuccess: p => {
-      setIsPeerCreated(true);
-      console.log("success peer added with ID:", p.id);
-    },
-  });
-
-  trpc.useSubscription(["room.on-join-room", { roomId: data.id }], {
-    onNext: p => {
-      while (localId === "") {}
-      for (const peer of p) {
-        console.log(peer);
-        if (peer.id === peerData?.id) {
-          console.log("same peer");
-        }
-      }
-      console.log("on-join-room", p);
-    },
-  });
-  // onAddOffer
-  trpc.useSubscription(["room.on-add-offer", { roomId: data.id }], {
-    onNext: o => {
-      console.log(o);
-    },
-  });
-  const { mutate: mutateAddOffer } = trpc.useMutation("room.add-offer", {
-    onSuccess: data => {
-      console.log("success local peer added with ID:", data);
-    },
-  });
-  // onAddAnswer
-  trpc.useSubscription(["room.on-add-answer", { roomId: data.id }], {
-    onNext: a => {
-      console.log("onAddAnswer", a);
-    },
-  });
-  const { mutate: mutateAddAnswer } = trpc.useMutation("room.add-answer", {
-    onSuccess: data => {
-      console.log("sent successfully from:", peerData?.id);
-    },
-  });
-  // onAddIceCandidate
-  trpc.useSubscription(["room.on-add-icecandidate", { roomId: data.id }], {
-    onNext: c => {
-      console.log("onAddIceCandidate", c);
-    },
-  });
-  const { mutate: mutateAddIceCandidate } = trpc.useMutation(
-    "room.add-icecanditate",
-    {
-      onSuccess: data => {
-        console.log("sent successfully from:", peerData?.id);
-      },
-    }
-  );
-
+const RoomPagePeerMedia: React.FC<{ peer: Peer; room: Room }> = ({
+  peer,
+  room,
+}) => {
   const localConnRef = useRef<RTCPeerConnection>();
   const localTracksRef = useRef<MediaStreamTrack[]>([]);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream>();
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteStreamRef = useRef<MediaStream>();
+  const otherPeerId = useRef<string>("");
 
-  useEffect(() => {
-    const init = async () => {
-      localStreamRef.current = await navigator.mediaDevices.getUserMedia({
-        video: true,
-      });
-      (localVideoRef.current as HTMLVideoElement).srcObject =
-        localStreamRef.current;
-    };
-    return () => {
-      init();
-    };
-  }, []);
+  trpc.useSubscription(
+    ["room.on-join-room", { roomId: room.id, peerId: peer.id }],
+    {
+      onNext: p => {
+        console.log("on-join-room new peer joined", p);
+      },
+    }
+  );
+  // onAddOffer
+  trpc.useSubscription(
+    ["room.on-add-offer", { roomId: room.id, peerId: peer.id }],
+    {
+      onNext: o => {
+        console.log(o);
+      },
+    }
+  );
+  const { mutate: mutateAddOffer } = trpc.useMutation("room.add-offer", {
+    onSuccess: data => {
+      console.log("offer sent successfully from", peer.id);
+    },
+  });
+  // onAddAnswer
+  trpc.useSubscription(
+    ["room.on-add-answer", { roomId: room.id, peerId: peer.id }],
+    {
+      onNext: a => {
+        console.log("onAddAnswer", a);
+      },
+    }
+  );
+  const { mutate: mutateAddAnswer } = trpc.useMutation("room.add-answer", {
+    onSuccess: data => {
+      console.log("answer sent successfully from", peer.id);
+    },
+  });
+  // onAddIceCandidate
+  trpc.useSubscription(
+    ["room.on-add-icecandidate", { roomId: room.id, peerId: peer.id }],
+    {
+      onNext: c => {
+        console.log("onAddIceCandidate", c);
+      },
+    }
+  );
+  const { mutate: mutateAddIceCandidate } = trpc.useMutation(
+    "room.add-icecandidate",
+    {
+      onSuccess: data => {
+        console.log("icecandidate sent successfully from:", peer.id);
+      },
+    }
+  );
 
   const createPeer = (peerId: string) => {
     const peer = new RTCPeerConnection();
@@ -114,8 +84,8 @@ const RoomPageContentMedia: React.FC<{ data: Room }> = ({ data }) => {
       .then(offer => localConnRef.current?.setLocalDescription(offer))
       .then(() => {
         mutateAddOffer({
-          roomId: data.id,
-          peerId: peerData?.id as string,
+          roomId: room.id,
+          targetId: otherPeerId,
           sdp: JSON.stringify(localConnRef.current?.localDescription?.toJSON()),
         });
       })
@@ -130,44 +100,44 @@ const RoomPageContentMedia: React.FC<{ data: Room }> = ({ data }) => {
   const handleICECandidateEvent = (event: RTCPeerConnectionIceEvent) => {
     if (event.candidate) {
       mutateAddIceCandidate({
-        roomId: data.id,
-        peerId: peerData?.id as string,
+        roomId: room.id,
+        targetId: otherPeerId.current,
         icecandidate: JSON.stringify(event.candidate.toJSON()),
       });
     }
   };
 
-  const handleCreateAnswer = async () => {
-    console.log("yikes");
-  };
+  useEffect(() => {
+    const init = async () => {
+      localStreamRef.current = await navigator.mediaDevices.getUserMedia({
+        video: true,
+      });
+      (localVideoRef.current as HTMLVideoElement).srcObject =
+        localStreamRef.current;
+    };
+    return () => {
+      init();
+    };
+  }, []);
 
-  const handleCreateOffer = async () => {
-    //get ice candidates
-    (localConnRef.current as RTCPeerConnection).onicecandidate = event => {
-      // console.log("target: ", event.target);
-      console.log((event.target as RTCPeerConnection).iceGatheringState);
-      if ((event.target as RTCPeerConnection).iceGatheringState != "complete") {
-        console.log("new candidate");
-        return;
-      }
-      console.log("onicecandidate", event.candidate, "\n", event);
-      event.candidate && console.log("new candidate", event.candidate.toJSON());
-      console.log(
-        "SDP on ice",
-        localConnRef.current?.localDescription?.toJSON()
-      );
-    };
-    //create offer
-    const offerDescription = await localConnRef.current?.createOffer();
-    await localConnRef.current?.setLocalDescription(offerDescription);
-    const offer = {
-      sdp: offerDescription?.sdp,
-      type: offerDescription?.type,
-    };
-    console.log("offer", offer);
-    console.log("SDP", localConnRef.current?.localDescription?.toJSON());
-    setOfferBtnDisabled(true);
-  };
+  return (
+    <>
+      <video autoPlay ref={localVideoRef} />
+      <video autoPlay ref={remoteVideoRef} />
+    </>
+  );
+};
+
+const RoomPagePeerContent: React.FC<{ data: Room }> = ({ data }) => {
+  const {
+    mutate,
+    isLoading,
+    data: peerData,
+  } = trpc.useMutation("room.add-peer", {
+    onSuccess: p => {
+      console.log("success peer added with ID:", p.id);
+    },
+  });
 
   return (
     <>
@@ -182,22 +152,7 @@ const RoomPageContentMedia: React.FC<{ data: Room }> = ({ data }) => {
       >
         Add Peer
       </button>
-      <button
-        onClick={handleCreateOffer}
-        className="border-solid border-blue-400 border rounded"
-        disabled={offerBtnDisabled}
-      >
-        Create Offer
-      </button>
-      <button
-        onClick={handleCreateAnswer}
-        className="border-solid border-blue-400 border rounded"
-        disabled={answerBtnDisabled}
-      >
-        Create Answer
-      </button>
-      <video autoPlay ref={localVideoRef} />
-      <video autoPlay ref={remoteVideoRef} />
+      {peerData && <RoomPagePeerMedia peer={peerData} room={data} />}
     </>
   );
 };
@@ -213,7 +168,7 @@ const RoomPageContent: React.FC<{ id: string }> = ({ id }) => {
     return <div>Room not found</div>;
   }
 
-  return <RoomPageContentMedia data={data} />;
+  return <RoomPagePeerContent data={data} />;
 };
 
 const RoomPage = () => {

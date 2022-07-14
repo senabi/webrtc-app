@@ -7,6 +7,7 @@ import { z } from "zod";
 const ee = new EventEmitter();
 
 export const roomRouter = createRouter()
+  // Room
   .query("get-by-id", {
     input: z.object({ id: z.string() }),
     async resolve({ input, ctx }) {
@@ -17,6 +18,7 @@ export const roomRouter = createRouter()
       });
     },
   })
+  // Room
   .mutation("create", {
     async resolve({ ctx }) {
       // await ctx.prisma.room.update.
@@ -25,34 +27,36 @@ export const roomRouter = createRouter()
       });
     },
   })
-  .mutation("add-answer", { // Answer
+  .mutation("add-answer", {
+    // Answer
     input: z.object({
       roomId: z.string(),
-      peerId: z.string(),
+      targetId: z.string(),
       answer: z.string(),
     }),
     async resolve({ input, ctx }) {
-      ee.emit("add-answer", input.roomId, input.answer, input.peerId);
+      ee.emit("add-answer", input.roomId, input.answer, input.targetId);
     },
   })
-  .subscription("on-add-answer", { // Answer subscription
+  .subscription("on-add-answer", {
+    // Answer subscription
     input: z.object({
       roomId: z.string(),
-      peerId: z.string().optional(),
+      peerId: z.string(),
     }),
     resolve({ input, ctx }) {
       type onAddAnswerSubType = {
-        senderId: string;
+        targetId: string;
         answer: string;
       };
       return new Subscription<onAddAnswerSubType>(emit => {
         const onAddAnswer = (
           roomId: string,
           answer: string,
-          senderId: string
+          targetId: string
         ) => {
-          if (roomId === input.roomId) {
-            emit.data({ senderId: senderId, answer });
+          if (roomId === input.roomId && targetId === input.peerId) {
+            emit.data({ targetId, answer });
           }
         };
         ee.on("add-answer", onAddAnswer);
@@ -60,34 +64,32 @@ export const roomRouter = createRouter()
       });
     },
   })
-  .mutation("add-offer", { // add offer
+  .mutation("add-offer", {
+    // add offer
     input: z.object({
       roomId: z.string(),
-      peerId: z.string(),
+      targetId: z.string(),
       sdp: z.string(),
     }),
     async resolve({ input, ctx }) {
-      ee.emit("add-offer", input.roomId, input.sdp, input.peerId);
+      ee.emit("add-offer", input.roomId, input.targetId, input.sdp);
     },
   })
-  .subscription("on-add-offer", { // offer subscription
+  .subscription("on-add-offer", {
+    // offer subscription
     input: z.object({
       roomId: z.string(),
-      peerId: z.string().optional(),
+      peerId: z.string(),
     }),
     resolve({ input, ctx }) {
       type onAddOfferSubType = {
-        senderId: string;
+        targetId: string;
         sdp: string;
       };
       return new Subscription<onAddOfferSubType>(emit => {
-        const onAddOffer = (
-          roomId: string,
-          senderId: string,
-          sdp: string,
-        ) => {
-          if (roomId === input.roomId) {
-            emit.data({ senderId: senderId, sdp });
+        const onAddOffer = (roomId: string, targetId: string, sdp: string) => {
+          if (roomId === input.roomId && targetId === input.peerId) {
+            emit.data({ targetId, sdp });
           }
         };
         ee.on("add-offer", onAddOffer);
@@ -95,34 +97,41 @@ export const roomRouter = createRouter()
       });
     },
   })
-  .mutation("add-icecanditate", { // add icecandiate
+  .mutation("add-icecandidate", {
+    // add icecandiate
     input: z.object({
       roomId: z.string(),
-      peerId: z.string(),
+      targetId: z.string(),
       icecandidate: z.string(),
     }),
     async resolve({ input, ctx }) {
-      ee.emit("add-icecandidate", input.roomId, input.icecandidate, input.peerId);
+      ee.emit(
+        "add-icecandidate",
+        input.roomId,
+        input.targetId,
+        input.icecandidate
+      );
     },
   })
-  .subscription("on-add-icecandidate", { // icecandidate subscription
+  .subscription("on-add-icecandidate", {
+    // icecandidate subscription
     input: z.object({
       roomId: z.string(),
-      peerId: z.string().optional(),
+      peerId: z.string(),
     }),
     resolve({ input, ctx }) {
       type onAddIceCandidateSubType = {
-        senderId: string;
+        targetId: string;
         icecandidate: string;
       };
       return new Subscription<onAddIceCandidateSubType>(emit => {
         const onAddICECandidate = (
           roomId: string,
-          senderId: string,
-          icecandidate: string,
+          targetId: string,
+          icecandidate: string
         ) => {
-          if (roomId === input.roomId) {
-            emit.data({ senderId: senderId, icecandidate });
+          if (roomId === input.roomId && targetId === input.peerId) {
+            emit.data({ targetId, icecandidate });
           }
         };
         ee.on("add-icecandidate", onAddICECandidate);
@@ -140,58 +149,45 @@ export const roomRouter = createRouter()
           roomId: input.roomId,
         },
       });
-      ee.emit("join", input.roomId);
+      ee.emit("join", input.roomId, peer);
       return peer;
     },
   })
   .subscription("on-join-room", {
     input: z.object({
       roomId: z.string(),
+      peerId: z.string(),
     }),
     async resolve({ input, ctx }) {
-      return new Subscription<Peer[]>(emit => {
-        const onJoin = async (roomId: string) => {
-          const users = await ctx.prisma.peer.findMany({
-            where: {
-              roomId: input.roomId,
-            },
-          });
-          if (roomId === input.roomId) {
-            emit.data(users);
-          }
+      return new Subscription<Peer>(emit => {
+        const onJoin = async (roomId: string, newPeer: Peer) => {
+          if (roomId !== input.roomId || newPeer.id === input.peerId) return;
+          // const users = await ctx.prisma.peer.findMany({
+          //   where: {
+          //     roomId: input.roomId,
+          //   },
+          // });
+          emit.data(newPeer);
         };
         ee.on("join", onJoin);
         return () => ee.off("join", emit.data);
       });
     },
   });
-// .subscription("onAddPeer", {
-//   input: z.object({ roomId: z.string() }),
-//   resolve({ input }) {
-//     return new Subscription<Peer>(emit => {
-//       const onAdd = (data: Peer) => {
-//         if (data.roomId === input.roomId) {
-//           emit.data(data);
-//         }
-//       };
-//       ee.on("add", onAdd);
-//       return () => ee.off("add", emit.data);
-//     });
-//   },
-// });
-// .subscription("onAddPeer", {
+// .subscription("on-other", {
 //   input: z.object({
 //     roomId: z.string(),
+//     peerId: z.string(),
 //   }),
-//   resolve() {
+//   async resolve({ input, ctx }) {
 //     return new Subscription<Peer>(emit => {
-//       const onAdd = (data: Peer) => {
-//         if (input.roomId === data.roomId) {
-//           emit.data(data);
-//         }
+//       const onJoin = async (roomId: string, newPeer: Peer) => {
+//         if (roomId !== input.roomId || newPeer.id === input.peerId) return;
+//         ctx.
+//         emit.data(newPeer);
 //       };
-//       ee.on("add", onAdd);
-//       return () => ee.off("add", onAdd);
+//       ee.on("other", onJoin);
+//       return () => ee.off("other", emit.data);
 //     });
 //   },
 // });
