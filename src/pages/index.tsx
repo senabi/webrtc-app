@@ -13,13 +13,6 @@ import { string } from "zod";
 
 const Home: NextPage = () => {
   const router = useRouter();
-  const hello = trpc.useQuery(["example.hello", { text: "from tRPC" }]);
-  // const [num, setNum] = useState(0);
-  trpc.useSubscription(["randomNumber", undefined], {
-    onNext(n) {
-      console.log(n);
-    },
-  });
   // const roomId =
   const { mutate, isLoading, data } = trpc.useMutation("room.create", {
     onSuccess: data => {
@@ -64,9 +57,6 @@ const Home: NextPage = () => {
             Join <span className="text-blue-500">Room</span>
           </button>
         </span>
-        <div className="py-6 text-2xl">
-          {hello.data ? <p>{hello.data.greeting}</p> : <p>Loading..</p>}
-        </div>
       </div>
     </>
   );

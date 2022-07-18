@@ -8,7 +8,9 @@ if (!global.fetch) {
   (global as any).fetch = fetch;
 }
 const wss = new ws.Server({
-  port: 3001,
+  port: process.env.WS_URL
+    ? parseInt(process.env.WS_URL.split(":")[2] as string)
+    : 3001,
 });
 
 const handler = applyWSSHandler({ wss, router: appRouter, createContext });

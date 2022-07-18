@@ -2,8 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   publicRuntimeConfig: {
-    APP_PORT: process.env.APP_PORT,
-    WS_PORT: process.env.WS_PORT,
+    APP_URL: process.env.APP_URL,
+    WS_URL: process.env.WS_URL,
   },
 };
 

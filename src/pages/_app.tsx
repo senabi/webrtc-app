@@ -13,7 +13,7 @@ import superjson from "superjson";
 import "../styles/globals.css";
 
 const {
-  publicRuntimeConfig: { APP_PORT, WS_PORT },
+  publicRuntimeConfig: { APP_URL, WS_URL },
 } = getConfig();
 
 const MyApp: AppType = ({ Component, pageProps }) => {
@@ -27,7 +27,8 @@ const getBaseUrl = () => {
   if (process.browser) return ""; // Browser should use current path
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`; // SSR should use vercel url
 
-  return `http://localhost:${APP_PORT}`; // dev SSR should use localhost
+  // return `http://localhost:${APP_PORT}`; // dev SSR should use localhost
+  return `${APP_URL}`; // dev SSR should use localhost
 };
 
 const getEndingLink = () => {
@@ -37,7 +38,8 @@ const getEndingLink = () => {
     });
   }
   const client = createWSClient({
-    url: `ws://localhost:${WS_PORT}`,
+    // url: `ws://localhost:${WS_PORT}`,
+    url: `${WS_URL}`,
   });
   return wsLink<AppRouter>({
     client,

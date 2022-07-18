@@ -13,12 +13,10 @@ datasource db {
 }
 
 model Room {
-    id              String           @id @default(cuid())
-    createdAt       DateTime         @default(now())
-    updatedAt       DateTime         @default(now())
-    offerCandidate  OfferCandidate?
-    answerCandidate AnswerCandidate?
-    peers           Peer[]
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+    peers     Peer[]
 }
 
 model Peer {
@@ -26,41 +24,3 @@ model Peer {
     roomId String
     room   Room   @relation(fields: [roomId], references: [id])
 }
-
-// peers     Peer[]
-// model Peer {
-//     id        String   @id @default(cuid())
-//     room      Room     @relation(fields: [roomId], references: [id])
-//     roomId    String
-//     createdAt DateTime @default(now())
-//     updatedAt DateTime @default(now())
-//     offer     String
-//     candidate String
-// }
-
-model OfferCandidate {
-    id        String   @id @default(cuid())
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now())
-    room      Room     @relation(fields: [roomId], references: [id])
-    roomId    String   @unique
-    data      String
-}
-
-model AnswerCandidate {
-    id        String   @id @default(cuid())
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now())
-    room      Room     @relation(fields: [roomId], references: [id])
-    roomId    String   @unique
-    data      String
-}
-
-// model Offer {
-//     id        String   @id @default(cuid())
-//     createdAt DateTime @default(now())
-//     updatedAt DateTime @default(now())
-//     peer      Peer     @relation(fields: [peerId], references: [id])
-//     peerId    String
-//     offer     String
-// }
