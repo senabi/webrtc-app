@@ -1,0 +1,13 @@
+version: '3'
+services:
+  webrtc-sfu:
+    container_name: 'webrtc-sfu-container'
+    image: 'ubuntu-webrtc'
+    restart: 'always'
+    tty: true
+    ports: 
+     - '3000-3001:3000-3001'
+     - '2000-2020:2000-2020'
+    #  - '10000-10100:10000-10100'
+    volumes:
+      - '.:/app'
