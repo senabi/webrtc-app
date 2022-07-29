@@ -122,6 +122,8 @@ const RoomPageData: React.FC<{
           rtpParameters,
         });
         mutateProduce({ msg });
+        // call callback
+        // emit new producer to all participants
         console.log("on transport produce sent");
       }
     );
